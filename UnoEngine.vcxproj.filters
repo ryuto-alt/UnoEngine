@@ -62,6 +62,9 @@
     <ClCompile Include="Source\Graphics\GraphicsDevice.cpp">
       <Filter>Engine\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Graphics\BufferManager.cpp">
+      <Filter>Engine\Graphics</Filter>
+    </ClCompile>
 
     <!-- Platform -->
     <ClCompile Include="Source\Platform\Window.cpp">
@@ -100,6 +103,9 @@
 
     <!-- Graphics Headers -->
     <ClInclude Include="Include\Graphics\GraphicsDevice.h">
+      <Filter>Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\Graphics\BufferManager.h">
       <Filter>Engine\Graphics</Filter>
     </ClInclude>
 
