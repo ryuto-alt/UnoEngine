@@ -32,6 +32,8 @@ namespace UnoEngine::Graphics
             if (!CreateCommandAllocators()) return false;
             if (!CreateCommandList())   return false;
             if (!CreateDescriptorHeaps()) return false;
+            if (!CreateRenderTargetViews()) return false;
+            if (!CreateDepthStencilBuffer()) return false;
             if (!CreateFence())         return false;
 
             m_isInitialized = true;
@@ -343,6 +345,8 @@ namespace UnoEngine::Graphics
         HRESULT hr = m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap));
         if (FAILED(hr)) return false;
 
+        m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
         // DSV descriptor heap
         D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc{};
         dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
@@ -353,6 +357,8 @@ namespace UnoEngine::Graphics
         hr = m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap));
         if (FAILED(hr)) return false;
 
+        m_dsvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+
         // SRV/CBV/UAV descriptor heap
         D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc{};
         srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
@@ -361,7 +367,11 @@ namespace UnoEngine::Graphics
         srvHeapDesc.NodeMask = 0;
 
         hr = m_device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_srvHeap));
-        return SUCCEEDED(hr);
+        if (FAILED(hr)) return false;
+
+        m_cbvSrvUavDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+        return true;
     }
 
     // ========================================
@@ -413,12 +423,28 @@ namespace UnoEngine::Graphics
 
         // Reset command list
         m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr);
+
+        // Transition back buffer from PRESENT to RENDER_TARGET state
+        CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+            m_renderTargets[m_frameIndex].Get(),
+            D3D12_RESOURCE_STATE_PRESENT,
+            D3D12_RESOURCE_STATE_RENDER_TARGET
+        );
+        m_commandList->ResourceBarrier(1, &barrier);
     }
 
     auto GraphicsDevice::EndFrame() -> void
     {
         UNO_ASSERT_NOT_NULL(m_commandList.Get(), "Command list");
         UNO_ASSERT_NOT_NULL(m_commandQueue.Get(), "Command queue");
+
+        // Transition back buffer to PRESENT state
+        CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+            m_renderTargets[m_frameIndex].Get(),
+            D3D12_RESOURCE_STATE_RENDER_TARGET,
+            D3D12_RESOURCE_STATE_PRESENT
+        );
+        m_commandList->ResourceBarrier(1, &barrier);
 
         // Close command list
         m_commandList->Close();
@@ -542,21 +568,20 @@ namespace UnoEngine::Graphics
 
         m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-        // Create RTV descriptor heap
-        D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
-        rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-        rtvHeapDesc.NumDescriptors = m_config.backBufferCount;
-        rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-        rtvHeapDesc.NodeMask = 0;
+        std::cout << "  Swap Chain created successfully (" << m_config.backBufferCount 
+                  << " buffers, " << m_config.width << "x" << m_config.height << ")" << std::endl;
+        return true;
+    }
 
-        hr = m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap));
-        if (FAILED(hr))
-        {
-            std::cerr << "Failed to create RTV descriptor heap!" << std::endl;
-            return false;
-        }
+    // ========================================
+    // Render Target Views Creation
+    // ========================================
 
-        m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    auto GraphicsDevice::CreateRenderTargetViews() -> bool
+    {
+        UNO_ASSERT_NOT_NULL(m_device.Get(), "Device");
+        UNO_ASSERT_NOT_NULL(m_swapChain.Get(), "SwapChain");
+        UNO_ASSERT_NOT_NULL(m_rtvHeap.Get(), "RTV Heap");
 
         // Create render target views for each back buffer
         m_renderTargets.resize(m_config.backBufferCount);
@@ -564,7 +589,7 @@ namespace UnoEngine::Graphics
 
         for (uint32 i = 0; i < m_config.backBufferCount; i++)
         {
-            hr = m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i]));
+            HRESULT hr = m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i]));
             if (FAILED(hr))
             {
                 std::cerr << "Failed to get swap chain buffer " << i << "!" << std::endl;
@@ -575,8 +600,69 @@ namespace UnoEngine::Graphics
             rtvHandle.Offset(1, m_rtvDescriptorSize);
         }
 
-        std::cout << "  Swap Chain created successfully (" << m_config.backBufferCount 
-                  << " buffers, " << m_config.width << "x" << m_config.height << ")" << std::endl;
+        std::cout << "  Render Target Views created successfully" << std::endl;
+        return true;
+    }
+
+    // ========================================
+    // Depth Stencil Buffer Creation
+    // ========================================
+
+    auto GraphicsDevice::CreateDepthStencilBuffer() -> bool
+    {
+        UNO_ASSERT_NOT_NULL(m_device.Get(), "Device");
+        UNO_ASSERT_NOT_NULL(m_dsvHeap.Get(), "DSV Heap");
+
+        // Create depth stencil texture
+        D3D12_RESOURCE_DESC depthStencilDesc{};
+        depthStencilDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        depthStencilDesc.Alignment = 0;
+        depthStencilDesc.Width = m_config.width;
+        depthStencilDesc.Height = m_config.height;
+        depthStencilDesc.DepthOrArraySize = 1;
+        depthStencilDesc.MipLevels = 1;
+        depthStencilDesc.Format = m_config.depthStencilFormat;
+        depthStencilDesc.SampleDesc.Count = 1;
+        depthStencilDesc.SampleDesc.Quality = 0;
+        depthStencilDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        depthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+        D3D12_CLEAR_VALUE clearValue{};
+        clearValue.Format = m_config.depthStencilFormat;
+        clearValue.DepthStencil.Depth = 1.0f;
+        clearValue.DepthStencil.Stencil = 0;
+
+        CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_DEFAULT);
+
+        HRESULT hr = m_device->CreateCommittedResource(
+            &heapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &depthStencilDesc,
+            D3D12_RESOURCE_STATE_DEPTH_WRITE,
+            &clearValue,
+            IID_PPV_ARGS(&m_depthStencil)
+        );
+
+        if (FAILED(hr))
+        {
+            std::cerr << "Failed to create depth stencil buffer!" << std::endl;
+            return false;
+        }
+
+        // Create depth stencil view
+        D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
+        dsvDesc.Format = m_config.depthStencilFormat;
+        dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+        dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+        dsvDesc.Texture2D.MipSlice = 0;
+
+        m_device->CreateDepthStencilView(
+            m_depthStencil.Get(),
+            &dsvDesc,
+            m_dsvHeap->GetCPUDescriptorHandleForHeapStart()
+        );
+
+        std::cout << "  Depth Stencil Buffer created successfully" << std::endl;
         return true;
     }
 

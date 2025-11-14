@@ -83,6 +83,7 @@
     <ClCompile Include="Source\Core\Engine.cpp" />
     <ClCompile Include="Source\Graphics\GraphicsDevice.cpp" />
     <ClCompile Include="Source\Platform\Window.cpp" />
+    <ClCompile Include="Source\Renderer\RenderGraph.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Include\Core\CoreTypes.h" />
@@ -91,6 +92,7 @@
     <ClInclude Include="Include\Core\Engine.h" />
     <ClInclude Include="Include\Graphics\GraphicsDevice.h" />
     <ClInclude Include="Include\Renderer\RenderGraph.h" />
+    <ClInclude Include="Include\Renderer\ClearPass.h" />
     <ClInclude Include="Include\Platform\Window.h" />
   </ItemGroup>
   <ItemGroup>

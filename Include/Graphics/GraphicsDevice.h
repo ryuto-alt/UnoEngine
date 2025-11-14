@@ -111,6 +111,18 @@ namespace UnoEngine::Graphics
             return m_config.backBufferCount;
         }
 
+        [[nodiscard]] auto GetCurrentRenderTargetView() const noexcept -> D3D12_CPU_DESCRIPTOR_HANDLE
+        {
+            D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
+            rtvHandle.ptr += static_cast<SIZE_T>(m_frameIndex) * m_rtvDescriptorSize;
+            return rtvHandle;
+        }
+
+        [[nodiscard]] auto GetDepthStencilView() const noexcept -> D3D12_CPU_DESCRIPTOR_HANDLE
+        {
+            return m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
+        }
+
     private:
         // ========================================
         // Initialization Helper Methods

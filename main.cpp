@@ -1,5 +1,7 @@
 #include "Include/Core/Engine.h"
 #include "Include/Core/Components.h"
+#include "Include/Renderer/RenderGraph.h"
+#include "Include/Renderer/ClearPass.h"
 #include <Windows.h>
 #include <iostream>
 
@@ -13,6 +15,7 @@ using namespace UnoEngine;
 using namespace UnoEngine::Core;
 using namespace UnoEngine::Core::ECS;
 using namespace UnoEngine::Core::Components;
+using namespace UnoEngine::Renderer;
 
 // ========================================
 // Sample Application
@@ -61,11 +64,48 @@ public:
 
     auto OnRender() -> void override
     {
-        // Rendering logic will be implemented with the render graph
         auto& graphicsDevice = GetGraphicsDevice();
+        auto* commandList = graphicsDevice.GetCommandList();
 
-        // For now, just clear the screen
-        // Actual rendering will be set up once we have shaders and pipeline states
+        // Create ClearPass
+        ClearPassConfig clearConfig;
+        clearConfig.clearColor[0] = 0.0f;  // R
+        clearConfig.clearColor[1] = 0.4f;  // G
+        clearConfig.clearColor[2] = 0.6f;  // B
+        clearConfig.clearColor[3] = 1.0f;  // A
+        clearConfig.clearDepth = true;
+
+        ClearPass clearPass(clearConfig);
+
+        // Create RenderGraph
+        RenderGraph renderGraph;
+
+        // Declare BackBuffer resource
+        ResourceDescriptor backBufferDesc;
+        backBufferDesc.name = "BackBuffer";
+        backBufferDesc.type = ResourceType::Texture2D;
+        backBufferDesc.usage = ResourceUsage::RenderTarget;
+        backBufferDesc.format = graphicsDevice.GetBackBufferFormat();
+        backBufferDesc.width = GetWindow().GetWidth();
+        backBufferDesc.height = GetWindow().GetHeight();
+        renderGraph.DeclareResource(backBufferDesc);
+
+        // Register BackBuffer resource
+        auto* backBufferResource = renderGraph.GetResource("BackBuffer");
+        if (backBufferResource)
+        {
+            backBufferResource->SetD3DResource(graphicsDevice.GetCurrentBackBuffer());
+            backBufferResource->SetCurrentState(D3D12_RESOURCE_STATE_RENDER_TARGET);
+        }
+
+        // Add ClearPass to RenderGraph
+        renderGraph.AddPass(clearPass.CreatePassDescriptor(graphicsDevice, "BackBuffer"));
+
+        // Compile and execute RenderGraph
+        if (renderGraph.Compile(graphicsDevice.GetDevice()))
+        {
+            renderGraph.Execute(commandList);
+        }
     }
 
     auto OnShutdown() -> void override
