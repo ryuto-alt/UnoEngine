@@ -1,0 +1,163 @@
+# ========================================
+# Visual Studio
+# ========================================
+
+# User-specific files (ユーザー固有ファイル)
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Visual Studio cache/options directory (キャッシュ・設定ディレクトリ)
+.vs/
+
+# Build results (ビルド結果)
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual C++ cache files (Visual C++キャッシュ)
+ipch/
+*.aps
+*.ncb
+*.opendb
+*.opensdf
+*.sdf
+*.cachefile
+*.VC.db
+*.VC.VC.opendb
+
+# ========================================
+# NuGet Packages
+# ========================================
+
+# NuGet package folders (NuGetパッケージフォルダ)
+packages/
+*.nupkg
+*.snupkg
+
+# NuGet v3's project.json files (project.jsonファイル)
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# ========================================
+# Build Output
+# ========================================
+
+# Compiled Object files (コンパイル済みオブジェクトファイル)
+*.obj
+*.o
+*.ko
+*.elf
+
+# Precompiled Headers (プリコンパイル済みヘッダー)
+*.gch
+*.pch
+
+# Compiled Dynamic libraries (コンパイル済み動的ライブラリ)
+*.dll
+*.so
+*.dylib
+
+# Executables (実行ファイル)
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Static libraries (静的ライブラリ)
+*.lib
+*.a
+*.la
+*.lo
+
+# ========================================
+# Windows System Files
+# ========================================
+
+# Windows thumbnail cache (Windowsサムネイルキャッシュ)
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+
+# Windows shortcuts (Windowsショートカット)
+*.lnk
+
+# Folder config file (フォルダ設定ファイル)
+[Dd]esktop.ini
+
+# Recycle Bin (ゴミ箱)
+$RECYCLE.BIN/
+
+# ========================================
+# Temporary Files
+# ========================================
+
+# Temporary files (一時ファイル)
+*.tmp
+*.temp
+*.log
+*.tlog
+*.lastbuildstate
+*.idb
+*.ilk
+*.pdb
+
+# ========================================
+# DirectX Compiled Shaders
+# ========================================
+
+# Compiled shader files (コンパイル済みシェーダーファイル)
+*.cso
+*.fxo
+
+# ========================================
+# IDE and Editor Files
+# ========================================
+
+# Visual Studio Code
+.vscode/
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# ========================================
+# Project-Specific
+# ========================================
+
+# External libraries managed by NuGet (NuGet管理の外部ライブラリ)
+# Note: external/DirectX-Headers/ is kept in Git (Git管理対象)
+
+# Build outputs (ビルド出力)
+*.pdb
+*.iobj
+*.ipdb
+
+# ========================================
+# Keep These Files (これらのファイルは保持)
+# ========================================
+
+# Keep external headers (外部ヘッダーは保持)
+!external/DirectX-Headers/
+
+# Keep project files (プロジェクトファイルは保持)
+!*.vcxproj
+!*.vcxproj.filters
+!*.props
+!*.sln

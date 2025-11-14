@@ -1,0 +1,527 @@
+#include "../../Include/Graphics/GraphicsDevice.h"
+#include <iostream>
+#include <stdexcept>
+#include <directx/d3dx12.h> // DirectX 12 Helper Library (DirectX-Headers)
+
+#ifdef _DEBUG
+#include <dxgidebug.h>
+#endif
+
+namespace UnoEngine::Graphics
+{
+    // ========================================
+    // Initialization
+    // ========================================
+
+    auto GraphicsDevice::Initialize(const GraphicsDeviceConfig& config, void* windowHandle) -> bool
+    {
+        if (m_isInitialized)
+        {
+            return true;
+        }
+
+        m_config = config;
+
+        try
+        {
+            if (!CreateFactory())       return false;
+            if (!SelectAdapter())       return false;
+            if (!CreateDevice())        return false;
+            if (!CreateCommandQueue())  return false;
+            if (!CreateSwapChain(windowHandle)) return false;
+            if (!CreateCommandAllocators()) return false;
+            if (!CreateCommandList())   return false;
+            if (!CreateDescriptorHeaps()) return false;
+            if (!CreateFence())         return false;
+
+            m_isInitialized = true;
+            return true;
+        }
+        catch (const std::exception&)
+        {
+            // Log error (implement logging system later)
+            return false;
+        }
+    }
+
+    auto GraphicsDevice::Shutdown() -> void
+    {
+        if (!m_isInitialized)
+        {
+            return;
+        }
+
+        // Wait for GPU to finish all work
+        WaitForGpu();
+
+        // Release resources
+        m_commandList.Reset();
+        m_commandAllocators.clear();
+        m_commandQueue.Reset();
+        m_swapChain.Reset();
+        m_renderTargets.clear();
+        m_depthStencil.Reset();
+        m_rtvHeap.Reset();
+        m_dsvHeap.Reset();
+        m_srvHeap.Reset();
+        m_fence.Reset();
+        m_device.Reset();
+        m_adapter.Reset();
+        m_factory.Reset();
+
+        if (m_fenceEvent)
+        {
+            CloseHandle(m_fenceEvent);
+            m_fenceEvent = nullptr;
+        }
+
+        m_isInitialized = false;
+    }
+
+    // ========================================
+    // Factory Creation
+    // ========================================
+
+    auto GraphicsDevice::CreateFactory() -> bool
+    {
+        uint32 dxgiFactoryFlags = 0;
+
+#ifdef _DEBUG
+        // Enable debug layer
+        if (m_config.enableDebugLayer)
+        {
+            ComPtr<ID3D12Debug> debugController;
+            if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+            {
+                debugController->EnableDebugLayer();
+                dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
+
+                if (m_config.enableGpuValidation)
+                {
+                    ComPtr<ID3D12Debug1> debugController1;
+                    if (SUCCEEDED(debugController.As(&debugController1)))
+                    {
+                        debugController1->SetEnableGPUBasedValidation(true);
+                    }
+                }
+            }
+        }
+#endif
+
+        HRESULT hr = CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&m_factory));
+        return SUCCEEDED(hr);
+    }
+
+    // ========================================
+    // Adapter Selection
+    // ========================================
+
+    auto GraphicsDevice::SelectAdapter() -> bool
+    {
+        ComPtr<IDXGIAdapter1> adapter1;
+
+        for (uint32 adapterIndex = 0;
+             m_factory->EnumAdapterByGpuPreference(
+                 adapterIndex,
+                 DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
+                 IID_PPV_ARGS(&adapter1)) != DXGI_ERROR_NOT_FOUND;
+             ++adapterIndex)
+        {
+            DXGI_ADAPTER_DESC1 desc;
+            adapter1->GetDesc1(&desc);
+
+            // Skip software adapters
+            if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+            {
+                continue;
+            }
+
+            // Check if adapter supports D3D12
+            if (SUCCEEDED(D3D12CreateDevice(adapter1.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
+            {
+                adapter1.As(&m_adapter);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // ========================================
+    // Device Creation
+    // ========================================
+
+    auto GraphicsDevice::CreateDevice() -> bool
+    {
+        UNO_ASSERT_NOT_NULL(m_adapter.Get(), "Adapter");
+
+        HRESULT hr = D3D12CreateDevice(
+            m_adapter.Get(),
+            D3D_FEATURE_LEVEL_11_0,
+            IID_PPV_ARGS(&m_device)
+        );
+
+        if (FAILED(hr))
+        {
+            std::cerr << "Failed to create D3D12 device! HRESULT: 0x" << std::hex << hr << std::dec << std::endl;
+            return false;
+        }
+
+        UNO_DEBUG_LOG("D3D12 Device created successfully");
+
+#ifdef _DEBUG
+        // Configure debug device settings
+        if (m_config.enableDebugLayer)
+        {
+            ComPtr<ID3D12InfoQueue> infoQueue;
+            if (SUCCEEDED(m_device.As(&infoQueue)))
+            {
+                infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
+                infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
+                infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, FALSE);
+
+                UNO_DEBUG_LOG("D3D12 Debug layer configured - Breaking on CORRUPTION and ERROR");
+            }
+        }
+#endif
+
+        // Get descriptor sizes
+        m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+        m_dsvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+        m_cbvSrvUavDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+        UNO_DEBUG_LOG("Descriptor sizes - RTV: " << m_rtvDescriptorSize
+                      << ", DSV: " << m_dsvDescriptorSize
+                      << ", CBV_SRV_UAV: " << m_cbvSrvUavDescriptorSize);
+
+        return true;
+    }
+
+    // ========================================
+    // Command Queue Creation
+    // ========================================
+
+    auto GraphicsDevice::CreateCommandQueue() -> bool
+    {
+        D3D12_COMMAND_QUEUE_DESC queueDesc{};
+        queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+        queueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
+        queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+        queueDesc.NodeMask = 0;
+
+        HRESULT hr = m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue));
+        return SUCCEEDED(hr);
+    }
+
+    // ========================================
+    // Command Allocators Creation
+    // ========================================
+
+    auto GraphicsDevice::CreateCommandAllocators() -> bool
+    {
+        UNO_ASSERT_NOT_NULL(m_device.Get(), "Device");
+        UNO_ASSERT(m_config.backBufferCount > 0, "backBufferCount must be greater than 0");
+
+        m_commandAllocators.resize(m_config.backBufferCount);
+        m_fenceValues.resize(m_config.backBufferCount, 0);
+
+        for (uint32 i = 0; i < m_config.backBufferCount; ++i)
+        {
+            HRESULT hr = m_device->CreateCommandAllocator(
+                D3D12_COMMAND_LIST_TYPE_DIRECT,
+                IID_PPV_ARGS(&m_commandAllocators[i])
+            );
+
+            if (FAILED(hr))
+            {
+                std::cerr << "Failed to create command allocator " << i << "!" << std::endl;
+                return false;
+            }
+
+            UNO_ASSERT_NOT_NULL(m_commandAllocators[i].Get(), "Created command allocator");
+        }
+
+        UNO_DEBUG_LOG("Created " << m_config.backBufferCount << " command allocators");
+        return true;
+    }
+
+    // ========================================
+    // Command List Creation
+    // ========================================
+
+    auto GraphicsDevice::CreateCommandList() -> bool
+    {
+        HRESULT hr = m_device->CreateCommandList(
+            0,
+            D3D12_COMMAND_LIST_TYPE_DIRECT,
+            m_commandAllocators[0].Get(),
+            nullptr,
+            IID_PPV_ARGS(&m_commandList)
+        );
+
+        if (FAILED(hr))
+        {
+            return false;
+        }
+
+        // Command lists are created in recording state, close it for now
+        m_commandList->Close();
+
+        return true;
+    }
+
+    // ========================================
+    // Descriptor Heaps Creation
+    // ========================================
+
+    auto GraphicsDevice::CreateDescriptorHeaps() -> bool
+    {
+        // RTV descriptor heap
+        D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
+        rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+        rtvHeapDesc.NumDescriptors = m_config.backBufferCount;
+        rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+        rtvHeapDesc.NodeMask = 0;
+
+        HRESULT hr = m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap));
+        if (FAILED(hr)) return false;
+
+        // DSV descriptor heap
+        D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc{};
+        dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+        dsvHeapDesc.NumDescriptors = 1;
+        dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+        dsvHeapDesc.NodeMask = 0;
+
+        hr = m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap));
+        if (FAILED(hr)) return false;
+
+        // SRV/CBV/UAV descriptor heap
+        D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc{};
+        srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        srvHeapDesc.NumDescriptors = 1000; // Allocate enough for various resources
+        srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        srvHeapDesc.NodeMask = 0;
+
+        hr = m_device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_srvHeap));
+        return SUCCEEDED(hr);
+    }
+
+    // ========================================
+    // Fence Creation
+    // ========================================
+
+    auto GraphicsDevice::CreateFence() -> bool
+    {
+        HRESULT hr = m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence));
+        if (FAILED(hr))
+        {
+            return false;
+        }
+
+        m_fenceValue = 1;
+
+        // Create event for GPU synchronization
+        m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+        if (m_fenceEvent == nullptr)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    // ========================================
+    // Frame Management
+    // ========================================
+
+    auto GraphicsDevice::BeginFrame() -> void
+    {
+        UNO_ASSERT(m_isInitialized, "GraphicsDevice is not initialized");
+        UNO_ASSERT_RANGE(m_frameIndex, m_commandAllocators.size(), "m_frameIndex");
+        UNO_ASSERT_NOT_NULL(m_commandAllocators[m_frameIndex].Get(), "Command allocator");
+        UNO_ASSERT_NOT_NULL(m_commandList.Get(), "Command list");
+
+        UNO_DEBUG_LOG("BeginFrame() - Frame index: " << m_frameIndex);
+
+        // Wait for this frame's GPU work to complete before resetting allocator
+        WaitForFence(m_fenceValues[m_frameIndex]);
+
+        // Reset command allocator for current frame
+        m_commandAllocators[m_frameIndex]->Reset();
+
+        // Reset command list
+        m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr);
+
+        UNO_DEBUG_LOG("Command allocator and list reset successfully");
+    }
+
+    auto GraphicsDevice::EndFrame() -> void
+    {
+        UNO_ASSERT_NOT_NULL(m_commandList.Get(), "Command list");
+        UNO_ASSERT_NOT_NULL(m_commandQueue.Get(), "Command queue");
+
+        // Close command list
+        m_commandList->Close();
+
+        // Execute command list
+        ID3D12CommandList* commandLists[] = { m_commandList.Get() };
+        m_commandQueue->ExecuteCommandLists(_countof(commandLists), commandLists);
+    }
+
+    auto GraphicsDevice::Present() -> void
+    {
+        UNO_ASSERT_NOT_NULL(m_swapChain.Get(), "Swap chain");
+
+        if (m_swapChain)
+        {
+            m_swapChain->Present(1, 0); // VSync on (1), VSync off (0)
+        }
+
+        MoveToNextFrame();
+    }
+
+    // ========================================
+    // Synchronization
+    // ========================================
+
+    auto GraphicsDevice::WaitForGpu() -> void
+    {
+        UNO_ASSERT_NOT_NULL(m_commandQueue.Get(), "Command queue");
+        UNO_ASSERT_NOT_NULL(m_fence.Get(), "Fence");
+
+        // Schedule a Signal command in the queue
+        m_commandQueue->Signal(m_fence.Get(), m_fenceValue);
+
+        // Wait until the fence has been processed
+        m_fence->SetEventOnCompletion(m_fenceValue, m_fenceEvent);
+        WaitForSingleObject(m_fenceEvent, INFINITE);
+
+        ++m_fenceValue;
+    }
+
+    auto GraphicsDevice::WaitForFence(uint64 fenceValue) -> void
+    {
+        UNO_ASSERT_NOT_NULL(m_fence.Get(), "Fence");
+
+        if (m_fence->GetCompletedValue() < fenceValue)
+        {
+            UNO_DEBUG_LOG("Waiting for fence value: " << fenceValue << " (current: " << m_fence->GetCompletedValue() << ")");
+            m_fence->SetEventOnCompletion(fenceValue, m_fenceEvent);
+            WaitForSingleObject(m_fenceEvent, INFINITE);
+            UNO_DEBUG_LOG("Fence completed: " << fenceValue);
+        }
+    }
+
+    auto GraphicsDevice::MoveToNextFrame() -> void
+    {
+        UNO_ASSERT_NOT_NULL(m_commandQueue.Get(), "Command queue");
+        UNO_ASSERT_NOT_NULL(m_swapChain.Get(), "Swap chain");
+
+        // Signal the fence for the current frame
+        const uint64 currentFenceValue = m_fenceValue;
+        m_fenceValues[m_frameIndex] = currentFenceValue;
+        m_commandQueue->Signal(m_fence.Get(), currentFenceValue);
+        ++m_fenceValue;
+
+        UNO_DEBUG_LOG("Frame " << m_frameIndex << " fence signaled: " << currentFenceValue);
+
+        // Move to next frame
+        m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+
+        UNO_DEBUG_LOG("Moving to frame index: " << m_frameIndex);
+
+        // Wait if the next frame is not ready yet
+        WaitForFence(m_fenceValues[m_frameIndex]);
+    }
+
+    // ========================================
+    // Create Swap Chain
+    // ========================================
+
+    auto GraphicsDevice::CreateSwapChain(void* windowHandle) -> bool
+    {
+        HWND hwnd = static_cast<HWND>(windowHandle);
+
+        // Describe swap chain
+        DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
+        swapChainDesc.Width = m_config.width;
+        swapChainDesc.Height = m_config.height;
+        swapChainDesc.Format = m_config.backBufferFormat;
+        swapChainDesc.Stereo = FALSE;
+        swapChainDesc.SampleDesc.Count = 1;
+        swapChainDesc.SampleDesc.Quality = 0;
+        swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+        swapChainDesc.BufferCount = m_config.backBufferCount;
+        swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
+        swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+        swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
+        swapChainDesc.Flags = 0;
+
+        // Create swap chain
+        ComPtr<IDXGISwapChain1> swapChain1;
+        HRESULT hr = m_factory->CreateSwapChainForHwnd(
+            m_commandQueue.Get(),
+            hwnd,
+            &swapChainDesc,
+            nullptr,
+            nullptr,
+            &swapChain1
+        );
+
+        if (FAILED(hr))
+        {
+            std::cerr << "Failed to create swap chain!" << std::endl;
+            return false;
+        }
+
+        // Query IDXGISwapChain4
+        hr = swapChain1.As(&m_swapChain);
+        if (FAILED(hr))
+        {
+            std::cerr << "Failed to query IDXGISwapChain4!" << std::endl;
+            return false;
+        }
+
+        // Disable Alt+Enter fullscreen toggle
+        m_factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
+
+        m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+
+        // Create RTV descriptor heap
+        D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
+        rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+        rtvHeapDesc.NumDescriptors = m_config.backBufferCount;
+        rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+        rtvHeapDesc.NodeMask = 0;
+
+        hr = m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap));
+        if (FAILED(hr))
+        {
+            std::cerr << "Failed to create RTV descriptor heap!" << std::endl;
+            return false;
+        }
+
+        m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
+        // Create render target views for each back buffer
+        m_renderTargets.resize(m_config.backBufferCount);
+        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
+
+        for (uint32 i = 0; i < m_config.backBufferCount; i++)
+        {
+            hr = m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i]));
+            if (FAILED(hr))
+            {
+                std::cerr << "Failed to get swap chain buffer " << i << "!" << std::endl;
+                return false;
+            }
+
+            m_device->CreateRenderTargetView(m_renderTargets[i].Get(), nullptr, rtvHandle);
+            rtvHandle.Offset(1, m_rtvDescriptorSize);
+        }
+
+        return true;
+    }
+
+} // namespace UnoEngine::Graphics
