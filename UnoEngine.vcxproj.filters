@@ -1,22 +1,161 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- ========================================
+       フィルタ定義
+       ======================================== -->
   <ItemGroup>
-    <Filter Include="ソース ファイル">
+    <!-- エンジンのソースコード -->
+    <Filter Include="Engine">
+      <UniqueIdentifier>{a1b2c3d4-e5f6-7890-abcd-ef1234567890}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Core">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="ヘッダー ファイル">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    <Filter Include="Engine\Graphics">
+      <UniqueIdentifier>{b2c3d4e5-f6a7-8901-bcde-f12345678901}</UniqueIdentifier>
     </Filter>
-    <Filter Include="リソース ファイル">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    <Filter Include="Engine\Renderer">
+      <UniqueIdentifier>{c3d4e5f6-a7b8-9012-cdef-123456789012}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Platform">
+      <UniqueIdentifier>{d4e5f6a7-b8c9-0123-def1-234567890123}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Scene">
+      <UniqueIdentifier>{e5f6a7b8-c9d0-1234-ef12-345678901234}</UniqueIdentifier>
+    </Filter>
+
+    <!-- シェーダー -->
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{d7e8c7c1-7a5f-4e9b-9b1a-3c5d4f6e7a8b}</UniqueIdentifier>
+      <Extensions>hlsl;hlsli;fx;fxh</Extensions>
+    </Filter>
+
+    <!-- 外部ライブラリ -->
+    <Filter Include="External">
+      <UniqueIdentifier>{f6a7b8c9-d0e1-2345-f123-456789012345}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External\ImGui">
+      <UniqueIdentifier>{a7b8c9d0-e1f2-3456-1234-567890123456}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External\ImGui\Core">
+      <UniqueIdentifier>{b8c9d0e1-f2a3-4567-2345-678901234567}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External\ImGui\Backends">
+      <UniqueIdentifier>{c9d0e1f2-a3b4-5678-3456-789012345678}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
+
+  <!-- ========================================
+       エンジンのソースファイル (.cpp)
+       ======================================== -->
   <ItemGroup>
     <ClCompile Include="main.cpp">
-      <Filter>ソース ファイル</Filter>
+      <Filter>Engine</Filter>
+    </ClCompile>
+
+    <!-- Core -->
+    <ClCompile Include="Source\Core\Engine.cpp">
+      <Filter>Engine\Core</Filter>
+    </ClCompile>
+
+    <!-- Graphics -->
+    <ClCompile Include="Source\Graphics\GraphicsDevice.cpp">
+      <Filter>Engine\Graphics</Filter>
+    </ClCompile>
+
+    <!-- Platform -->
+    <ClCompile Include="Source\Platform\Window.cpp">
+      <Filter>Engine\Platform</Filter>
+    </ClCompile>
+
+    <!-- Renderer -->
+    <ClCompile Include="Source\Renderer\RenderGraph.cpp">
+      <Filter>Engine\Renderer</Filter>
+    </ClCompile>
+  </ItemGroup>
+
+  <!-- ========================================
+       エンジンのヘッダーファイル (.h)
+       ======================================== -->
+  <ItemGroup>
+    <!-- Core Headers -->
+    <ClInclude Include="Include\Core\CoreTypes.h">
+      <Filter>Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\Core\EntityComponentSystem.h">
+      <Filter>Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\Core\Components.h">
+      <Filter>Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\Core\Engine.h">
+      <Filter>Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\Core\Logger.h">
+      <Filter>Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\Core\Expected.h">
+      <Filter>Engine\Core</Filter>
+    </ClInclude>
+
+    <!-- Graphics Headers -->
+    <ClInclude Include="Include\Graphics\GraphicsDevice.h">
+      <Filter>Engine\Graphics</Filter>
+    </ClInclude>
+
+    <!-- Renderer Headers -->
+    <ClInclude Include="Include\Renderer\RenderGraph.h">
+      <Filter>Engine\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\Renderer\ClearPass.h">
+      <Filter>Engine\Renderer</Filter>
+    </ClInclude>
+
+    <!-- Platform Headers -->
+    <ClInclude Include="Include\Platform\Window.h">
+      <Filter>Engine\Platform</Filter>
+    </ClInclude>
+  </ItemGroup>
+
+  <!-- ========================================
+       シェーダーファイル (.hlsl)
+       ======================================== -->
+  <ItemGroup>
+    <FxCompile Include="Shaders\BasicVertex.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\BasicPixel.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+  </ItemGroup>
+
+  <!-- ========================================
+       外部ライブラリ: ImGui
+       ======================================== -->
+  <ItemGroup>
+    <!-- ImGui Core Files -->
+    <ClCompile Include="external\imgui\imgui.cpp">
+      <Filter>External\ImGui\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="external\imgui\imgui_demo.cpp">
+      <Filter>External\ImGui\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="external\imgui\imgui_draw.cpp">
+      <Filter>External\ImGui\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="external\imgui\imgui_tables.cpp">
+      <Filter>External\ImGui\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="external\imgui\imgui_widgets.cpp">
+      <Filter>External\ImGui\Core</Filter>
+    </ClCompile>
+
+    <!-- ImGui Backends -->
+    <ClCompile Include="external\imgui\backends\imgui_impl_win32.cpp">
+      <Filter>External\ImGui\Backends</Filter>
+    </ClCompile>
+    <ClCompile Include="external\imgui\backends\imgui_impl_dx12.cpp">
+      <Filter>External\ImGui\Backends</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
