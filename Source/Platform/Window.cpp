@@ -359,10 +359,27 @@ namespace UnoEngine::Platform
         {
         case WM_CLOSE:
         {
+            std::cout << "[Window::WM_CLOSE] Received WM_CLOSE message" << std::endl;
+
             if (m_callbacks.onClose)
             {
+                std::cout << "[Window::WM_CLOSE] Calling onClose callback..." << std::endl;
                 m_callbacks.onClose();
+                std::cout << "[Window::WM_CLOSE] onClose callback completed" << std::endl;
             }
+
+            std::cout << "[Window::WM_CLOSE] Posting WM_QUIT..." << std::endl;
+            // Post quit message directly without calling DestroyWindow
+            // This allows the engine to properly shutdown and then destroy the window
+            // in Engine::Shutdown() -> m_window.Destroy()
+            PostQuitMessage(0);
+            std::cout << "[Window::WM_CLOSE] WM_CLOSE processing complete" << std::endl;
+            return 0;
+        }
+
+        case WM_DESTROY:
+        {
+            // If DestroyWindow is called explicitly, ensure WM_QUIT is posted
             PostQuitMessage(0);
             return 0;
         }

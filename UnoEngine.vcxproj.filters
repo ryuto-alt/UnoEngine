@@ -81,6 +81,14 @@
     <ClCompile Include="Source\Renderer\RenderGraph.cpp">
       <Filter>Engine\Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Renderer\PrimitiveRenderer.cpp">
+      <Filter>Engine\Renderer</Filter>
+    </ClCompile>
+
+    <!-- Scene -->
+    <ClCompile Include="Source\Scene\Camera.cpp">
+      <Filter>Engine\Scene</Filter>
+    </ClCompile>
   </ItemGroup>
 
   <!-- ========================================
@@ -120,6 +128,9 @@
     <ClInclude Include="Include\Graphics\ShaderManager.h">
       <Filter>Engine\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="Include\Graphics\VertexTypes.h">
+      <Filter>Engine\Graphics</Filter>
+    </ClInclude>
 
     <!-- Renderer Headers -->
     <ClInclude Include="Include\Renderer\RenderGraph.h">
@@ -128,10 +139,18 @@
     <ClInclude Include="Include\Renderer\ClearPass.h">
       <Filter>Engine\Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="Include\Renderer\PrimitiveRenderer.h">
+      <Filter>Engine\Renderer</Filter>
+    </ClInclude>
 
     <!-- Platform Headers -->
     <ClInclude Include="Include\Platform\Window.h">
       <Filter>Engine\Platform</Filter>
+    </ClInclude>
+
+    <!-- Scene Headers -->
+    <ClInclude Include="Include\Scene\Camera.h">
+      <Filter>Engine\Scene</Filter>
     </ClInclude>
   </ItemGroup>
 
@@ -139,10 +158,24 @@
        シェーダーファイル (.hlsl)
        ======================================== -->
   <ItemGroup>
+    <!-- Common HLSL Headers -->
+    <None Include="Shaders\Common.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+
+    <!-- Basic Shaders -->
     <FxCompile Include="Shaders\BasicVertex.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
     <FxCompile Include="Shaders\BasicPixel.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+
+    <!-- Simple Shaders (Basic folder) -->
+    <FxCompile Include="Shaders\Basic\SimpleVertex.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\Basic\SimplePixel.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>

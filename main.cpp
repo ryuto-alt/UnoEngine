@@ -48,8 +48,46 @@ public:
         // Create a sample cube
         CreateCube();
 
+        // Setup RenderGraph once during initialization
+        SetupRenderGraph();
+
         std::cout << "Sample Application initialized successfully!" << std::endl;
         return true;
+    }
+
+    auto SetupRenderGraph() -> void
+    {
+        auto& graphicsDevice = GetGraphicsDevice();
+        auto& renderGraph = GetRenderGraph();
+
+        // Declare BackBuffer resource
+        ResourceDescriptor backBufferDesc;
+        backBufferDesc.name = "BackBuffer";
+        backBufferDesc.type = ResourceType::Texture2D;
+        backBufferDesc.usage = ResourceUsage::RenderTarget;
+        backBufferDesc.format = graphicsDevice.GetBackBufferFormat();
+        backBufferDesc.width = GetWindow().GetWidth();
+        backBufferDesc.height = GetWindow().GetHeight();
+        renderGraph.DeclareResource(backBufferDesc);
+
+        // Create ClearPass
+        ClearPassConfig clearConfig;
+        clearConfig.clearColor[0] = 0.0f;  // R
+        clearConfig.clearColor[1] = 0.4f;  // G
+        clearConfig.clearColor[2] = 0.6f;  // B
+        clearConfig.clearColor[3] = 1.0f;  // A
+        clearConfig.clearDepth = true;
+
+        ClearPass clearPass(clearConfig);
+
+        // Add ClearPass to RenderGraph
+        renderGraph.AddPass(clearPass.CreatePassDescriptor(graphicsDevice, "BackBuffer"));
+
+        // Compile RenderGraph
+        if (!renderGraph.Compile(graphicsDevice.GetDevice()))
+        {
+            std::cerr << "Failed to compile RenderGraph!" << std::endl;
+        }
     }
 
     auto OnUpdate(float deltaTime) -> void override
@@ -65,32 +103,10 @@ public:
     auto OnRender() -> void override
     {
         auto& graphicsDevice = GetGraphicsDevice();
+        auto& renderGraph = GetRenderGraph();
         auto* commandList = graphicsDevice.GetCommandList();
 
-        // Create ClearPass
-        ClearPassConfig clearConfig;
-        clearConfig.clearColor[0] = 0.0f;  // R
-        clearConfig.clearColor[1] = 0.4f;  // G
-        clearConfig.clearColor[2] = 0.6f;  // B
-        clearConfig.clearColor[3] = 1.0f;  // A
-        clearConfig.clearDepth = true;
-
-        ClearPass clearPass(clearConfig);
-
-        // Create RenderGraph
-        RenderGraph renderGraph;
-
-        // Declare BackBuffer resource
-        ResourceDescriptor backBufferDesc;
-        backBufferDesc.name = "BackBuffer";
-        backBufferDesc.type = ResourceType::Texture2D;
-        backBufferDesc.usage = ResourceUsage::RenderTarget;
-        backBufferDesc.format = graphicsDevice.GetBackBufferFormat();
-        backBufferDesc.width = GetWindow().GetWidth();
-        backBufferDesc.height = GetWindow().GetHeight();
-        renderGraph.DeclareResource(backBufferDesc);
-
-        // Register BackBuffer resource
+        // Update BackBuffer resource (changes every frame due to swap chain)
         auto* backBufferResource = renderGraph.GetResource("BackBuffer");
         if (backBufferResource)
         {
@@ -98,14 +114,8 @@ public:
             backBufferResource->SetCurrentState(D3D12_RESOURCE_STATE_RENDER_TARGET);
         }
 
-        // Add ClearPass to RenderGraph
-        renderGraph.AddPass(clearPass.CreatePassDescriptor(graphicsDevice, "BackBuffer"));
-
-        // Compile and execute RenderGraph
-        if (renderGraph.Compile(graphicsDevice.GetDevice()))
-        {
-            renderGraph.Execute(commandList);
-        }
+        // Execute RenderGraph
+        renderGraph.Execute(commandList);
     }
 
     auto OnShutdown() -> void override
@@ -250,7 +260,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
         std::cout << "Starting main loop..." << std::endl;
         int32 exitCode = app.Run();
 
+        std::cout << "[main] Run() returned, calling Shutdown()..." << std::endl;
         app.Shutdown();
+        std::cout << "[main] Shutdown() complete" << std::endl;
 
         std::cout << "Application exited with code: " << exitCode << std::endl;
         return exitCode;

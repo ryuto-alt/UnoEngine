@@ -92,6 +92,8 @@
     <ClCompile Include="Source\Graphics\ShaderManager.cpp" />
     <ClCompile Include="Source\Platform\Window.cpp" />
     <ClCompile Include="Source\Renderer\RenderGraph.cpp" />
+    <ClCompile Include="Source\Renderer\PrimitiveRenderer.cpp" />
+    <ClCompile Include="Source\Scene\Camera.cpp" />
     <ClCompile Include="external\imgui\imgui.cpp" />
     <ClCompile Include="external\imgui\imgui_demo.cpp" />
     <ClCompile Include="external\imgui\imgui_draw.cpp" />
@@ -105,16 +107,27 @@
     <ClInclude Include="Include\Core\EntityComponentSystem.h" />
     <ClInclude Include="Include\Core\Components.h" />
     <ClInclude Include="Include\Core\Engine.h" />
+    <ClInclude Include="Include\Core\Logger.h" />
+    <ClInclude Include="Include\Core\Expected.h" />
     <ClInclude Include="Include\Graphics\GraphicsDevice.h" />
     <ClInclude Include="Include\Graphics\BufferManager.h" />
     <ClInclude Include="Include\Graphics\DescriptorHeapManager.h" />
     <ClInclude Include="Include\Graphics\ShaderManager.h" />
+    <ClInclude Include="Include\Graphics\VertexTypes.h" />
     <ClInclude Include="Include\Renderer\RenderGraph.h" />
     <ClInclude Include="Include\Renderer\ClearPass.h" />
+    <ClInclude Include="Include\Renderer\PrimitiveRenderer.h" />
     <ClInclude Include="Include\Platform\Window.h" />
+    <ClInclude Include="Include\Scene\Camera.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\Common.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\BasicVertex.hlsl">
@@ -125,6 +138,20 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="Shaders\BasicPixel.hlsl">
+      <ShaderType>Pixel</ShaderType>
+      <ShaderModel>6.0</ShaderModel>
+      <ObjectFileOutput>$(OutDir)%(Filename).cso</ObjectFileOutput>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Shaders\Basic\SimpleVertex.hlsl">
+      <ShaderType>Vertex</ShaderType>
+      <ShaderModel>6.0</ShaderModel>
+      <ObjectFileOutput>$(OutDir)%(Filename).cso</ObjectFileOutput>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Shaders\Basic\SimplePixel.hlsl">
       <ShaderType>Pixel</ShaderType>
       <ShaderModel>6.0</ShaderModel>
       <ObjectFileOutput>$(OutDir)%(Filename).cso</ObjectFileOutput>

@@ -67,6 +67,7 @@ namespace UnoEngine::Core
             // Process window events
             if (!ProcessWindowEvents())
             {
+                std::cout << "[Engine::Run] Window closed, exiting main loop..." << std::endl;
                 break;
             }
 
@@ -86,6 +87,7 @@ namespace UnoEngine::Core
             EndFrame();
         }
 
+        std::cout << "[Engine::Run] Main loop exited, returning to main()..." << std::endl;
         return 0;
     }
 
@@ -101,7 +103,11 @@ namespace UnoEngine::Core
         // Call user shutdown
         OnShutdown();
 
-        // Shutdown systems
+        // Shutdown systems in correct order:
+        // 1. RenderGraph must be cleared BEFORE GraphicsDevice shutdown
+        //    (RenderGraph holds references to BackBuffer from GraphicsDevice)
+        // 2. GraphicsDevice shutdown (waits for GPU, releases all D3D12 resources)
+        // 3. Window destruction
         m_renderGraph.Reset();
         m_graphicsDevice.Shutdown();
         m_window.Destroy();
@@ -129,8 +135,10 @@ namespace UnoEngine::Core
 
         callbacks.onClose = [this]()
         {
-            std::cout << "Window close requested." << std::endl;
+            std::cout << "[Engine::onClose] Window close requested." << std::endl;
+            std::cout << "[Engine::onClose] Calling RequestExit()..." << std::endl;
             RequestExit();
+            std::cout << "[Engine::onClose] RequestExit() completed" << std::endl;
         };
 
         callbacks.onFocus = [this](bool focused)
