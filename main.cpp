@@ -163,7 +163,13 @@ private:
 // Application Entry Point
 // ========================================
 
+#ifdef _DEBUG
+// Debug build: Use console application entry point
+int main(int argc, char** argv)
+#else
+// Release build: Use Windows application entry point
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int)
+#endif
 {
     try
     {

@@ -84,17 +84,23 @@ namespace UnoEngine::Graphics
 
     auto GraphicsDevice::CreateFactory() -> bool
     {
+        std::cout << "\n========================================" << std::endl;
+        std::cout << "Initializing DirectX 12 Graphics Device" << std::endl;
+        std::cout << "========================================" << std::endl;
+
         uint32 dxgiFactoryFlags = 0;
 
 #ifdef _DEBUG
         // Enable debug layer
         if (m_config.enableDebugLayer)
         {
+            std::cout << "\n[1/8] Enabling D3D12 Debug Layer..." << std::endl;
             ComPtr<ID3D12Debug> debugController;
             if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
             {
                 debugController->EnableDebugLayer();
                 dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
+                std::cout << "  D3D12 Debug Layer enabled" << std::endl;
 
                 if (m_config.enableGpuValidation)
                 {
@@ -102,13 +108,29 @@ namespace UnoEngine::Graphics
                     if (SUCCEEDED(debugController.As(&debugController1)))
                     {
                         debugController1->SetEnableGPUBasedValidation(true);
+                        std::cout << "  GPU-based validation enabled" << std::endl;
                     }
                 }
             }
         }
+        else
+        {
+            std::cout << "\n[1/8] Creating DXGI Factory (Debug layer disabled)..." << std::endl;
+        }
+#else
+        std::cout << "\n[1/8] Creating DXGI Factory (Release mode)..." << std::endl;
 #endif
 
         HRESULT hr = CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&m_factory));
+        if (SUCCEEDED(hr))
+        {
+            std::cout << "  DXGI Factory created successfully" << std::endl;
+        }
+        else
+        {
+            std::cerr << "  ERROR: Failed to create DXGI Factory! HRESULT: 0x" 
+                      << std::hex << hr << std::dec << std::endl;
+        }
         return SUCCEEDED(hr);
     }
 
@@ -120,6 +142,10 @@ namespace UnoEngine::Graphics
     {
         ComPtr<IDXGIAdapter1> adapter1;
 
+        std::cout << "\n[2/8] Enumerating GPU Adapters..." << std::endl;
+        std::cout << "========================================" << std::endl;
+        std::cout << "========================================" << std::endl;
+
         for (uint32 adapterIndex = 0;
              m_factory->EnumAdapterByGpuPreference(
                  adapterIndex,
@@ -130,20 +156,42 @@ namespace UnoEngine::Graphics
             DXGI_ADAPTER_DESC1 desc;
             adapter1->GetDesc1(&desc);
 
+            // Convert wide string to narrow string for console output
+            char adapterName[128];
+            wcstombs_s(nullptr, adapterName, sizeof(adapterName), desc.Description, _TRUNCATE);
+
+            std::cout << "\n[GPU " << adapterIndex << "] " << adapterName << std::endl;
+            std::cout << "  Dedicated Video Memory: " 
+                      << (desc.DedicatedVideoMemory / 1024 / 1024) << " MB" << std::endl;
+            std::cout << "  Dedicated System Memory: " 
+                      << (desc.DedicatedSystemMemory / 1024 / 1024) << " MB" << std::endl;
+            std::cout << "  Shared System Memory: " 
+                      << (desc.SharedSystemMemory / 1024 / 1024) << " MB" << std::endl;
+            std::cout << "  Vendor ID: 0x" << std::hex << desc.VendorId << std::dec << std::endl;
+            std::cout << "  Device ID: 0x" << std::hex << desc.DeviceId << std::dec << std::endl;
+
             // Skip software adapters
             if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
             {
+                std::cout << "  [SKIPPED] Software adapter" << std::endl;
                 continue;
             }
 
             // Check if adapter supports D3D12
             if (SUCCEEDED(D3D12CreateDevice(adapter1.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
             {
+                std::cout << "  [SELECTED] D3D12 Feature Level 11.0 supported!" << std::endl;
+                std::cout << "========================================" << std::endl;
                 adapter1.As(&m_adapter);
                 return true;
             }
+            else
+            {
+                std::cout << "  [REJECTED] D3D12 not supported" << std::endl;
+            }
         }
 
+        std::cerr << "\nERROR: No compatible D3D12 adapter found!" << std::endl;
         return false;
     }
 
@@ -153,6 +201,7 @@ namespace UnoEngine::Graphics
 
     auto GraphicsDevice::CreateDevice() -> bool
     {
+        std::cout << "\n[3/8] Creating D3D12 Device..." << std::endl;
         UNO_ASSERT_NOT_NULL(m_adapter.Get(), "Adapter");
 
         HRESULT hr = D3D12CreateDevice(
@@ -167,7 +216,7 @@ namespace UnoEngine::Graphics
             return false;
         }
 
-        UNO_DEBUG_LOG("D3D12 Device created successfully");
+        std::cout << "  D3D12 Device created successfully" << std::endl;
 
 #ifdef _DEBUG
         // Configure debug device settings
@@ -190,10 +239,6 @@ namespace UnoEngine::Graphics
         m_dsvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
         m_cbvSrvUavDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-        UNO_DEBUG_LOG("Descriptor sizes - RTV: " << m_rtvDescriptorSize
-                      << ", DSV: " << m_dsvDescriptorSize
-                      << ", CBV_SRV_UAV: " << m_cbvSrvUavDescriptorSize);
-
         return true;
     }
 
@@ -203,6 +248,7 @@ namespace UnoEngine::Graphics
 
     auto GraphicsDevice::CreateCommandQueue() -> bool
     {
+        std::cout << "\n[4/8] Creating Command Queue..." << std::endl;
         D3D12_COMMAND_QUEUE_DESC queueDesc{};
         queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
         queueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
@@ -210,6 +256,14 @@ namespace UnoEngine::Graphics
         queueDesc.NodeMask = 0;
 
         HRESULT hr = m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue));
+        if (SUCCEEDED(hr))
+        {
+            std::cout << "  Command Queue created successfully" << std::endl;
+        }
+        else
+        {
+            std::cerr << "  ERROR: Failed to create Command Queue!" << std::endl;
+        }
         return SUCCEEDED(hr);
     }
 
@@ -219,6 +273,7 @@ namespace UnoEngine::Graphics
 
     auto GraphicsDevice::CreateCommandAllocators() -> bool
     {
+        std::cout << "\n[6/8] Creating Command Allocators..." << std::endl;
         UNO_ASSERT_NOT_NULL(m_device.Get(), "Device");
         UNO_ASSERT(m_config.backBufferCount > 0, "backBufferCount must be greater than 0");
 
@@ -241,7 +296,7 @@ namespace UnoEngine::Graphics
             UNO_ASSERT_NOT_NULL(m_commandAllocators[i].Get(), "Created command allocator");
         }
 
-        UNO_DEBUG_LOG("Created " << m_config.backBufferCount << " command allocators");
+        std::cout << "  " << m_config.backBufferCount << " Command Allocators created" << std::endl;
         return true;
     }
 
@@ -251,6 +306,7 @@ namespace UnoEngine::Graphics
 
     auto GraphicsDevice::CreateCommandList() -> bool
     {
+        std::cout << "\n[7/8] Creating Command List..." << std::endl;
         HRESULT hr = m_device->CreateCommandList(
             0,
             D3D12_COMMAND_LIST_TYPE_DIRECT,
@@ -267,6 +323,7 @@ namespace UnoEngine::Graphics
         // Command lists are created in recording state, close it for now
         m_commandList->Close();
 
+        std::cout << "  Command List created successfully" << std::endl;
         return true;
     }
 
@@ -313,6 +370,7 @@ namespace UnoEngine::Graphics
 
     auto GraphicsDevice::CreateFence() -> bool
     {
+        std::cout << "\n[8/8] Creating Fence for GPU synchronization..." << std::endl;
         HRESULT hr = m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence));
         if (FAILED(hr))
         {
@@ -325,9 +383,14 @@ namespace UnoEngine::Graphics
         m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
         if (m_fenceEvent == nullptr)
         {
+            std::cerr << "  ERROR: Failed to create fence event!" << std::endl;
             return false;
         }
 
+        std::cout << "  Fence and synchronization event created" << std::endl;
+        std::cout << "\n========================================" << std::endl;
+        std::cout << "Graphics Device Initialized Successfully!" << std::endl;
+        std::cout << "========================================\n" << std::endl;
         return true;
     }
 
@@ -342,8 +405,6 @@ namespace UnoEngine::Graphics
         UNO_ASSERT_NOT_NULL(m_commandAllocators[m_frameIndex].Get(), "Command allocator");
         UNO_ASSERT_NOT_NULL(m_commandList.Get(), "Command list");
 
-        UNO_DEBUG_LOG("BeginFrame() - Frame index: " << m_frameIndex);
-
         // Wait for this frame's GPU work to complete before resetting allocator
         WaitForFence(m_fenceValues[m_frameIndex]);
 
@@ -352,8 +413,6 @@ namespace UnoEngine::Graphics
 
         // Reset command list
         m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr);
-
-        UNO_DEBUG_LOG("Command allocator and list reset successfully");
     }
 
     auto GraphicsDevice::EndFrame() -> void
@@ -406,10 +465,8 @@ namespace UnoEngine::Graphics
 
         if (m_fence->GetCompletedValue() < fenceValue)
         {
-            UNO_DEBUG_LOG("Waiting for fence value: " << fenceValue << " (current: " << m_fence->GetCompletedValue() << ")");
             m_fence->SetEventOnCompletion(fenceValue, m_fenceEvent);
             WaitForSingleObject(m_fenceEvent, INFINITE);
-            UNO_DEBUG_LOG("Fence completed: " << fenceValue);
         }
     }
 
@@ -424,12 +481,8 @@ namespace UnoEngine::Graphics
         m_commandQueue->Signal(m_fence.Get(), currentFenceValue);
         ++m_fenceValue;
 
-        UNO_DEBUG_LOG("Frame " << m_frameIndex << " fence signaled: " << currentFenceValue);
-
         // Move to next frame
         m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-
-        UNO_DEBUG_LOG("Moving to frame index: " << m_frameIndex);
 
         // Wait if the next frame is not ready yet
         WaitForFence(m_fenceValues[m_frameIndex]);
@@ -441,6 +494,7 @@ namespace UnoEngine::Graphics
 
     auto GraphicsDevice::CreateSwapChain(void* windowHandle) -> bool
     {
+        std::cout << "\n[5/8] Creating Swap Chain..." << std::endl;
         HWND hwnd = static_cast<HWND>(windowHandle);
 
         // Describe swap chain
@@ -521,6 +575,8 @@ namespace UnoEngine::Graphics
             rtvHandle.Offset(1, m_rtvDescriptorSize);
         }
 
+        std::cout << "  Swap Chain created successfully (" << m_config.backBufferCount 
+                  << " buffers, " << m_config.width << "x" << m_config.height << ")" << std::endl;
         return true;
     }
 
