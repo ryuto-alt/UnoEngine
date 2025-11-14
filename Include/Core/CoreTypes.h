@@ -94,6 +94,23 @@ namespace UnoEngine::Core
 } // namespace UnoEngine::Core
 
 // ========================================
+// Global Type Aliases (for convenience)
+// ========================================
+
+using int8    = UnoEngine::Core::int8;
+using int16   = UnoEngine::Core::int16;
+using int32   = UnoEngine::Core::int32;
+using int64   = UnoEngine::Core::int64;
+
+using uint8   = UnoEngine::Core::uint8;
+using uint16  = UnoEngine::Core::uint16;
+using uint32  = UnoEngine::Core::uint32;
+using uint64  = UnoEngine::Core::uint64;
+
+using float32 = UnoEngine::Core::float32;
+using float64 = UnoEngine::Core::float64;
+
+// ========================================
 // Debug Macros
 // ========================================
 

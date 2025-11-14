@@ -1,5 +1,7 @@
 #pragma once
 
+#pragma once
+
 #include "CoreTypes.h"
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -120,3 +122,9 @@ namespace UnoEngine::Core
     };
 
 } // namespace UnoEngine::Core
+
+// ========================================
+// Global Type Alias (for convenience)
+// ========================================
+
+using Logger = UnoEngine::Core::Logger;

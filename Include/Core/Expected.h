@@ -161,3 +161,12 @@ namespace UnoEngine::Core
     using Error = std::string;
 
 } // namespace UnoEngine::Core
+
+// ========================================
+// Global Type Aliases (for convenience)
+// ========================================
+
+template<typename T, typename E>
+using Expected = UnoEngine::Core::Expected<T, E>;
+
+using Error = UnoEngine::Core::Error;
