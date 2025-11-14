@@ -3,7 +3,7 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="UnoEngine.vcxproj">
+  <Project Path="UnoEngine.vcxproj" Id="7162099a-8b0f-46df-ac37-9d1417294dab">
     <Build Solution="*|x86" Project="false" />
   </Project>
 </Solution>
